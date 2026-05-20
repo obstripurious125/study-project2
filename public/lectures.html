@@ -692,8 +692,7 @@ function renderSidebar(chapters) {
     div.onclick = () => { selectChapter(ch._id); if (window.innerWidth < 768) toggleSidebar(); };
     container.appendChild(div);
   });
-}
-function renderLectures(lectures) {
+}function renderLectures(lectures) {
   const container = document.getElementById('main-content');
   let html = '';
   if (lectures.length === 0) {
@@ -708,13 +707,23 @@ function renderLectures(lectures) {
     const hasDpp = lec.hasDpp === true;
     const hasNotes = pdfLink && pdfLink.trim() !== '';
 
-    let resourceButtons = '';
-    if (hasNotes || hasDpp) {
-      resourceButtons = `<button onclick="openResourceModal('${lectureId}', '${pdfLink.replace(/'/g, "\\'")}', ${hasDpp}, '${(lec.printableNotesLink || '').replace(/'/g, "\\'")}')" class="w-32 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-700 py-2.5 rounded-2xl text-sm font-medium flex items-center justify-center gap-2">
-          <i class="fa-solid fa-folder-open"></i> Resources
-        </button>`;
-    } else {
-      resourceButtons = `<button disabled class="w-32 bg-gray-100 text-gray-400 py-2.5 rounded-2xl text-sm font-medium cursor-not-allowed">No Resources</button>`;
+    // Build the DPP button ONLY when hasDpp is true
+    let dppButton = '';
+    if (hasDpp) {
+      dppButton = `<button onclick="openDpp('${(lec.dppLink || '').replace(/'/g, "\\'")}')" class="w-32 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-2xl text-sm font-medium flex items-center justify-center gap-2">
+        <i class="fa-solid fa-file-lines"></i> DPP
+      </button>`;
+    }
+
+    // Build the Notes button (unchanged logic, just renamed)
+    let notesButton = '';
+    if (hasNotes) {
+      notesButton = `<button onclick="openResourceModal('${lectureId}', '${pdfLink.replace(/'/g, "\\'")}', false, '${(lec.printableNotesLink || '').replace(/'/g, "\\'")}')" class="w-32 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-700 py-2.5 rounded-2xl text-sm font-medium flex items-center justify-center gap-2">
+        <i class="fa-solid fa-folder-open"></i> Notes
+      </button>`;
+    } else if (!hasDpp) {
+      // If neither notes nor DPP exists, show a disabled "No Resources"
+      notesButton = `<button disabled class="w-32 bg-gray-100 text-gray-400 py-2.5 rounded-2xl text-sm font-medium cursor-not-allowed">No Resources</button>`;
     }
 
     html += `
@@ -727,7 +736,8 @@ function renderLectures(lectures) {
           </div>
           <div class="flex gap-3 mt-5 items-center">
             <button onclick="playVideo('${lec.youtubeId || ''}')" class="w-32 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-2xl text-sm font-medium flex items-center justify-center gap-2"><i class="fa-solid fa-play"></i> Watch</button>
-            ${resourceButtons}
+            ${dppButton}
+            ${notesButton}
             ${lec.remark ? `<button onclick="showRemarkModal('${lec.remark.replace(/'/g, "\\'")}')" class="text-gray-400 hover:text-blue-500 text-xl ml-auto" title="Info"><i class="fa-solid fa-circle-info"></i></button>` : ''}
           </div>
         </div>
