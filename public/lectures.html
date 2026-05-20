@@ -695,41 +695,24 @@ function renderSidebar(chapters) {
 }
 function renderLectures(lectures) {
   const container = document.getElementById('main-content');
+  let html = '';
   if (lectures.length === 0) {
     container.innerHTML = `<p class="text-center text-gray-500 py-20">No lectures found.</p>`;
     return;
   }
-  
-  let html = '';
   lectures.forEach(lec => {
     const imageUrl = lec.imageUrl || "https://via.placeholder.com/80x80/1f2937/ffffff?text=Instructor";
     const isCompleted = lec.completed === true;
     const lectureId = lec._id;
     const pdfLink = lec.pdfLink || '';
-    const dppLink = lec.dppLink || '';
-    const printableLink = lec.printableNotesLink || '';
-    const hasPdf = pdfLink && pdfLink.trim() !== '';
-    const hasDpp = dppLink && dppLink.trim() !== '';
-    const hasPrintable = printableLink && printableLink.trim() !== '';
-    const hasAnyResource = hasPdf || hasDpp || hasPrintable;   // ← fixed: include DPP here
+    const hasDpp = lec.hasDpp === true;
 
-    // "Resources" button – opens modal with all three links
-    let resourceButtons = '';
-    if (hasAnyResource) {
-      resourceButtons = `<button onclick='openResourceModal("${lectureId}", "${pdfLink.replace(/'/g, "\\'")}", "${dppLink.replace(/'/g, "\\'")}", "${printableLink.replace(/'/g, "\\'")}")' class="w-32 border-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-700 py-2.5 rounded-2xl text-sm font-medium flex items-center justify-center gap-2">
-          <i class="fa-solid fa-folder-open"></i> Resources
-        </button>`;
-    } else {
-      resourceButtons = `<button disabled class="w-32 bg-gray-100 text-gray-400 py-2.5 rounded-2xl text-sm font-medium cursor-not-allowed">No Resources</button>`;
-    }
-
-    // ✅ SMART INDICATOR: small "DPP" badge only when DPP exists
-    let dppBadge = '';
-    if (hasDpp) {
-      dppBadge = `<span class="inline-flex items-center gap-1 ml-2 px-2 py-0.5 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
-        <i class="fa-solid fa-file-lines text-[10px]"></i> DPP
-      </span>`;
-    }
+    // ✅ DPP BADGE – only if hasDpp is true
+    const dppBadge = hasDpp
+      ? `<span class="inline-flex items-center gap-1 ml-2 px-2 py-0.5 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
+           <i class="fa-solid fa-file-lines text-[10px]"></i> DPP
+         </span>`
+      : '';
 
     html += `
       <div class="lecture-card bg-white rounded-3xl p-5 flex gap-4 border border-gray-100 mb-5">
@@ -738,17 +721,16 @@ function renderLectures(lectures) {
           <div class="flex justify-between items-start">
             <div>
               <span class="text-xs text-gray-500">${lec.date || 'N/A'} • ${lec.duration || '45m'}</span>
-              <div class="flex items-center gap-2">
-                <h3 class="font-semibold text-base mt-1 line-clamp-2">${lec.title}</h3>
+              <div class="flex items-center gap-2 mt-1">
+                <h3 class="font-semibold text-base line-clamp-2">${lec.title}</h3>
                 ${dppBadge}
               </div>
             </div>
             <button onclick="markLectureComplete('${lec._id}')" class="w-9 h-9 flex items-center justify-center rounded-full border-2 flex-shrink-0 ${isCompleted ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 hover:border-green-500 hover:bg-green-50'}">${isCompleted ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-check text-gray-400"></i>'}</button>
           </div>
-          <div class="flex gap-3 mt-5 items-center">
-            <button onclick="playVideo('${lec.youtubeId || ''}')" class="w-32 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-2xl text-sm font-medium flex items-center justify-center gap-2"><i class="fa-solid fa-play"></i> Watch</button>
-            ${resourceButtons}
-            ${lec.remark ? `<button onclick="showRemarkModal('${lec.remark.replace(/'/g, "\\'")}')" class="text-gray-400 hover:text-blue-500 text-xl ml-auto" title="Info"><i class="fa-solid fa-circle-info"></i></button>` : ''}
+          <div class="flex gap-3 mt-5">
+            <button onclick="playVideo('${lec.youtubeId || ''}')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-2xl text-sm font-medium flex items-center justify-center gap-2"><i class="fa-solid fa-play"></i> Watch</button>
+            <button onclick="showNotesModal('${lectureId}', '${pdfLink}', ${hasDpp})" class="flex-1 border-2 border-gray-300 hover:border-gray-400 hover:bg-gray-50 py-2.5 rounded-2xl text-sm font-medium flex items-center justify-center gap-2"><i class="fa-solid fa-book-open"></i> Notes & More</button>
           </div>
         </div>
       </div>`;
