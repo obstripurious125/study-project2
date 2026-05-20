@@ -692,7 +692,8 @@ function renderSidebar(chapters) {
     div.onclick = () => { selectChapter(ch._id); if (window.innerWidth < 768) toggleSidebar(); };
     container.appendChild(div);
   });
-}function renderLectures(lectures) {
+}
+  function renderLectures(lectures) {
   const container = document.getElementById('main-content');
   let html = '';
   if (lectures.length === 0) {
@@ -744,6 +745,13 @@ function renderSidebar(chapters) {
       </div>`;
   });
   container.innerHTML = html;
+}
+function openDpp(dppLink) {
+  if (!dppLink) {
+    showToast('No DPP available for this lecture.', 'info');
+    return;
+  }
+  window.open(dppLink, '_blank');
 }
 let currentLectureId = '';
 let currentHasDpp = false;
