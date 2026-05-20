@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<script src="/auth-check.js" defer></script>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Study Log - My PW</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+</head>
+<body class="bg-gray-100">
+  <nav class="bg-white shadow-md px-8 py-4 flex justify-between items-center">
+    <h1 class="text-3xl font-bold text-blue-600">My PW</h1>
+    <div class="flex gap-6">
+      <a href="dashboard.html" class="text-gray-600 hover:text-blue-600">Dashboard</a>
+      <button onclick="logout()" class="px-5 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-2xl">Logout</button>
+    </div>
+  </nav>
+
+  <div class="max-w-4xl mx-auto px-8 py-10">
+    <h2 class="text-4xl font-bold text-gray-800 mb-2">📅 Study Log</h2>
+    <p class="text-gray-600 mb-6">Track what you studied, hour by hour</p>
+
+    <div class="bg-white rounded-3xl shadow-xl p-6 mb-8">
+      <label class="block text-sm font-medium mb-2">Select Date</label>
+      <input type="date" id="logDate" class="border rounded-2xl px-4 py-2 mb-4" />
+      <div id="activitiesContainer" class="space-y-3">
+        <div class="flex gap-2 items-center">
+          <input type="time" id="startTime" class="border rounded-xl px-3 py-2 w-28" value="06:00">
+          <span>–</span>
+          <input type="time" id="endTime" class="border rounded-xl px-3 py-2 w-28" value="08:00">
+          <input type="text" id="activity" placeholder="e.g., Simplification DPP" class="flex-1 border rounded-xl px-3 py-2">
+          <button onclick="addActivity()" class="bg-blue-600 text-white px-4 py-2 rounded-xl">+</button>
+        </div>
+      </div>
+      <button onclick="saveLog()" class="mt-6 w-full bg-green-600 text-white py-3 rounded-2xl font-semibold">Save Today's Log</button>
+    </div>
+
+    <div class="bg-white rounded-3xl shadow-xl p-6">
+      <h3 class="text-xl font-semibold mb-4">Recent Activity</h3>
+      <div id="recentLogs"></div>
+    </div>
+  </div>
+
+  <script>
+    let currentActivities = [];
+
+    function addActivity() {
+      const container = document.getElementById('activitiesContainer');
+      const div = document.createElement('div');
+      div.className = 'flex gap-2 items-center mt-2';
+      div.innerHTML = `
+        <input type="time" class="start border rounded-xl px-3 py-2 w-28" value="09:00">
+        <span>–</span>
+        <input type="time" class="end border rounded-xl px-3 py-2 w-28" value="11:00">
+        <input type="text" class="activity-name flex-1 border rounded-xl px-3 py-2" placeholder="Activity">
+        <button onclick="this.parentElement.remove()" class="text-red-500"><i class="fas fa-trash"></i></button>
+      `;
+      container.appendChild(div);
+    }
+
+    async function saveLog() {
+      const date = document.getElementById('logDate').value;
+      if (!date) return alert('Select a date');
+      const activities = [];
+      document.querySelectorAll('#activitiesContainer > div').forEach(div => {
+        const start = div.querySelector('.start')?.value;
+        const end = div.querySelector('.end')?.value;
+        const act = div.querySelector('.activity-name')?.value;
+        if (start && end && act) {
+          activities.push({ startTime: start, endTime: end, activity: act });
+        }
+      });
+      const totalMinutes = activities.reduce((sum, a) => {
+        const start = new Date(`2000-01-01T${a.startTime}`);
+        const end = new Date(`2000-01-01T${a.endTime}`);
+        return sum + (end - start) / 60000;
+      }, 0);
+      await fetch('/api/study-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, activities, totalMinutes }),
+        credentials: 'include'
+      });
+      alert('Saved!');
+      loadRecent();
+    }
+
+    async function loadRecent() {
+      const res = await fetch('/api/study-log', { credentials: 'include' });
+      const logs = await res.json();
+      const container = document.getElementById('recentLogs');
+      if (logs.length === 0) {
+        container.innerHTML = '<p class="text-gray-500">No logs yet.</p>';
+        return;
+      }
+      container.innerHTML = logs.map(log => `
+        <div class="border-b py-3">
+          <div class="font-semibold">${new Date(log.date).toDateString()}</div>
+          <div class="text-sm text-gray-600">Total: ${log.totalMinutes} min</div>
+          ${log.activities.map(act => `<div class="text-sm ml-4">⏰ ${act.startTime}–${act.endTime} : ${act.activity}</div>`).join('')}
+        </div>
+      `).join('');
+    }
+
+    async function logout() {
+      await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+      window.location.href = '/login.html';
+    }
+
+    document.getElementById('logDate').valueAsDate = new Date();
+    loadRecent();
+  </script>
+</body>
+</html>

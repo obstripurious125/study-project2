@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<script src="/auth-check.js" defer></script>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Revision - My PW</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script>
+  <style>
+    .option { border: 1px solid #ddd; padding: 10px; margin: 6px 0; border-radius: 12px; cursor: pointer; }
+    .selected { background: #dbeafe; border-color: #3b82f6; }
+  </style>
+</head>
+<body class="bg-gray-100">
+  <nav class="bg-white shadow-md px-8 py-4 flex justify-between items-center">
+    <h1 class="text-3xl font-bold text-blue-600">Daily Revision</h1>
+    <a href="dashboard.html" class="text-gray-600">Dashboard</a>
+  </nav>
+
+  <div class="max-w-3xl mx-auto px-8 py-10">
+    <div id="revisionContainer"></div>
+  </div>
+
+  <script>
+    let revisions = [];
+    let currentIndex = 0;
+    let selectedOption = null;
+
+    async function loadDue() {
+      const res = await fetch('/api/revisions/due', { credentials: 'include' });
+      revisions = await res.json();
+      if (revisions.length === 0) {
+        document.getElementById('revisionContainer').innerHTML = '<div class="bg-white rounded-3xl p-12 text-center">🎉 No due revisions! Great job.</div>';
+        return;
+      }
+      renderCard();
+    }
+
+    function renderCard() {
+      const rev = revisions[currentIndex];
+      const html = `
+        <div class="bg-white rounded-3xl shadow-xl p-6">
+          <div class="flex justify-between mb-4">
+            <span class="text-sm bg-purple-100 text-purple-700 px-3 py-1 rounded-full">Revision ${currentIndex+1}/${revisions.length}</span>
+            <span class="text-sm text-gray-500">${rev.lectureName}</span>
+          </div>
+          <div class="text-lg font-medium mb-6">${rev.questionText}</div>
+          <div id="options"></div>
+          <div class="flex justify-between mt-8">
+            <button id="prevBtn" class="px-4 py-2 border rounded-xl" ${currentIndex===0 ? 'disabled' : ''}>Previous</button>
+            <button id="nextBtn" class="px-4 py-2 border rounded-xl" ${currentIndex===revisions.length-1 ? 'disabled' : ''}>Next</button>
+          </div>
+          <div class="mt-6 flex gap-3">
+            <button id="hardBtn" class="flex-1 bg-red-100 text-red-700 py-3 rounded-2xl">Hard (Forgot)</button>
+            <button id="goodBtn" class="flex-1 bg-green-100 text-green-700 py-3 rounded-2xl">Good</button>
+            <button id="easyBtn" class="flex-1 bg-blue-100 text-blue-700 py-3 rounded-2xl">Easy</button>
+          </div>
+        </div>
+      `;
+      document.getElementById('revisionContainer').innerHTML = html;
+      renderOptions(rev);
+      attachEvents();
+    }
+
+    function renderOptions(rev) {
+      const container = document.getElementById('options');
+      container.innerHTML = '';
+      rev.options.forEach((opt, i) => {
+        const div = document.createElement('div');
+        div.className = `option ${selectedOption === i ? 'selected' : ''}`;
+        div.innerHTML = `${String.fromCharCode(65+i)}. ${opt}`;
+        div.onclick = () => {
+          document.querySelectorAll('.option').forEach(el => el.classList.remove('selected'));
+          div.classList.add('selected');
+          selectedOption = i;
+        };
+        container.appendChild(div);
+      });
+      if (typeof renderMathInElement !== 'undefined') renderMathInElement(container, { delimiters: [{left: '\\\\(', right: '\\\\)', display: false}] });
+    }
+
+    async function submitReview(quality) {
+      if (selectedOption === null) return alert('Select an answer first');
+      const rev = revisions[currentIndex];
+      const isCorrect = (selectedOption === rev.correctAnswer);
+      // quality mapping: 0=hard/wrong, 3=good, 5=easy
+      let q = 3;
+      if (quality === 'hard') q = isCorrect ? 2 : 0;
+      else if (quality === 'easy') q = 5;
+      else q = isCorrect ? 4 : 1;
+
+      await fetch('/api/revisions/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ revisionId: rev._id, quality: q }),
+        credentials: 'include'
+      });
+      selectedOption = null;
+      if (currentIndex + 1 < revisions.length) {
+        currentIndex++;
+        renderCard();
+      } else {
+        alert('All revisions done for today!');
+        loadDue(); // reload to remove submitted ones
+      }
+    }
+
+    function attachEvents() {
+      document.getElementById('prevBtn')?.addEventListener('click', () => { if(currentIndex>0) { currentIndex--; selectedOption=null; renderCard(); } });
+      document.getElementById('nextBtn')?.addEventListener('click', () => { if(currentIndex<revisions.length-1) { currentIndex++; selectedOption=null; renderCard(); } });
+      document.getElementById('hardBtn')?.addEventListener('click', () => submitReview('hard'));
+      document.getElementById('goodBtn')?.addEventListener('click', () => submitReview('good'));
+      document.getElementById('easyBtn')?.addEventListener('click', () => submitReview('easy'));
+    }
+
+    loadDue();
+  </script>
+</body>
+</html>

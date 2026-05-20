@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<script src="/auth-check.js" defer></script>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Custom Practice - My PW</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f3f4f6; }
+    .question-palette-btn {
+      transition: all 0.2s ease;
+    }
+    .question-palette-btn:hover {
+      transform: scale(1.05);
+    }
+    .option-card {
+      transition: all 0.2s ease;
+      border: 1px solid #e5e7eb;
+    }
+    .option-card:hover {
+      background-color: #f9fafb;
+      transform: translateX(4px);
+    }
+    .selected-option {
+      background-color: #dbeafe !important;
+      border-color: #3b82f6 !important;
+      border-width: 2px !important;
+    }
+    .correct-option {
+      background-color: #d1fae5 !important;
+      border-color: #10b981 !important;
+      border-width: 2px !important;
+    }
+    .wrong-option {
+      background-color: #fee2e2 !important;
+      border-color: #ef4444 !important;
+      border-width: 2px !important;
+    }
+    .sidebar {
+      transition: transform 0.3s ease;
+    }
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed;
+        left: -280px;
+        top: 0;
+        bottom: 0;
+        z-index: 100;
+        width: 280px;
+        background: white;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+      }
+      .sidebar.open {
+        transform: translateX(280px);
+      }
+    }
+    .result-question-card {
+      transition: all 0.2s;
+    }
+    .result-question-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    }
+    .expand-btn {
+      cursor: pointer;
+      user-select: none;
+    }
+    .explanation-content {
+      display: none;
+      border-top: 1px solid #e5e7eb;
+      margin-top: 12px;
+      padding-top: 12px;
+    }
+    .explanation-content.show {
+      display: block;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- Navbar -->
+  <nav class="bg-white shadow-md px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+    <div class="flex items-center gap-3">
+      <h1 class="text-2xl font-bold text-blue-600">My PW</h1>
+      <span class="text-gray-500 text-sm hidden sm:inline">Custom Practice</span>
+    </div>
+    <div class="flex gap-6 items-center">
+      <a href="dashboard.html" class="text-gray-600 hover:text-blue-600">Dashboard</a>
+      <a href="analytics.html" class="text-gray-600 hover:text-blue-600">Analytics</a>
+      <button onclick="logout()" class="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl text-sm font-medium">Logout</button>
+    </div>
+  </nav>
+
+  <!-- Mobile sidebar toggle -->
+  <div class="fixed bottom-6 right-6 z-50 md:hidden">
+    <button id="mobile-toggle" class="bg-blue-600 text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center">
+      <i class="fas fa-list-ul text-xl"></i>
+    </button>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <!-- Topic Badge -->
+    <div class="mb-6 text-center">
+      <p id="topicBadge" class="text-gray-600 text-sm bg-white inline-block px-4 py-2 rounded-full shadow-sm"></p>
+    </div>
+
+    <div class="flex gap-6 relative">
+      <!-- Sidebar / Question Palette -->
+      <div id="sidebar" class="sidebar w-72 flex-shrink-0 bg-white rounded-2xl shadow-md p-4 overflow-y-auto h-[calc(100vh-120px)] sticky top-24">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="font-semibold text-gray-800">Questions</h3>
+          <span id="answered-count" class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">0/0</span>
+        </div>
+        <div id="question-palette" class="grid grid-cols-4 gap-2">
+          <!-- dynamically filled -->
+        </div>
+        <div class="mt-4 pt-4 border-t">
+          <div class="flex justify-between text-xs text-gray-500 mb-1">
+            <span>Answered</span>
+            <span id="palette-answered">0</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-2">
+            <div id="palette-progress" class="bg-green-500 h-2 rounded-full" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Question Area -->
+      <div class="flex-1">
+        <div id="practiceContainer">
+          <div id="questionCard" class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <div class="flex justify-between items-start mb-4">
+              <div class="flex items-center gap-3">
+                <span id="qNum" class="text-sm font-bold bg-blue-100 text-blue-700 px-3 py-1 rounded-full">Q1</span>
+                <span id="topicTag" class="text-xs bg-gray-200 text-gray-600 px-3 py-1 rounded-full"></span>
+              </div>
+            </div>
+            <div id="questionText" class="text-xl font-medium text-gray-800 mb-6 leading-relaxed"></div>
+            <div id="optionsList" class="space-y-3"></div>
+            <div class="flex justify-between mt-8 pt-4 border-t">
+              <button id="prevBtn" class="px-5 py-2 border border-gray-300 rounded-xl hover:bg-gray-50 text-gray-700 font-medium transition"><i class="fas fa-arrow-left mr-2"></i>Previous</button>
+              <button id="nextBtn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition">Next<i class="fas fa-arrow-right ml-2"></i></button>
+            </div>
+          </div>
+          <div class="flex justify-end">
+            <button id="resetBtn" class="px-5 py-2 border border-gray-300 rounded-xl hover:bg-gray-50 text-gray-600 mr-3">Reset Answers</button>
+            <button id="submitBtn" class="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium">Submit & See Results</button>
+          </div>
+        </div>
+
+        <!-- Results Page (initially hidden) -->
+        <div id="resultsCard" class="hidden">
+          <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <div class="flex justify-between items-center flex-wrap gap-3">
+              <div>
+                <h2 class="text-2xl font-bold text-gray-800">📊 Practice Results</h2>
+                <p class="text-gray-500 text-sm"><span id="dash-q-count">0</span> Questions</p>
+              </div>
+              <div class="flex gap-3">
+                <button onclick="location.reload()" class="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium">Practice Again</button>
+                <a href="/dashboard.html" class="px-4 py-2 border border-gray-300 rounded-xl text-sm font-medium">Home</a>
+              </div>
+            </div>
+          </div>
+          <div class="bg-white rounded-2xl shadow-lg p-6 text-center mb-6">
+            <p class="text-gray-500 uppercase tracking-wide text-sm">Your Score</p>
+            <div class="text-5xl font-extrabold text-blue-600 my-2">
+              <span id="final-score">0</span><span class="text-2xl text-gray-400">/<span id="final-total">0</span></span>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div class="bg-white rounded-xl p-4 text-center shadow-sm border"><p class="text-xs text-gray-500">CORRECT</p><p class="text-2xl font-bold text-green-600" id="res-c">0</p></div>
+            <div class="bg-white rounded-xl p-4 text-center shadow-sm border"><p class="text-xs text-gray-500">INCORRECT</p><p class="text-2xl font-bold text-red-600" id="res-i">0</p></div>
+            <div class="bg-white rounded-xl p-4 text-center shadow-sm border"><p class="text-xs text-gray-500">SKIPPED</p><p class="text-2xl font-bold text-gray-600" id="res-s">0</p></div>
+            <div class="bg-white rounded-xl p-4 text-center shadow-sm border"><p class="text-xs text-gray-500">ACCURACY</p><p class="text-2xl font-bold text-blue-600" id="res-acc">0%</p></div>
+          </div>
+          <div class="mt-6">
+            <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">📋 Question-wise Analysis</h3>
+            <div id="detailedResults" class="space-y-4"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- XSS Prevention ----------
+    function escapeHtml(text) {
+      if (!text) return '';
+      return text.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+      });
+    }
+
+    let questions = [];
+    let userAnswers = [];
+    let currentIndex = 0;
+    let submitted = false;
+
+    // ---------- Load Practice ----------
+    async function loadPractice() {
+      const urlParams = new URLSearchParams(window.location.search);
+      let topics = urlParams.get('topics');
+      if (!topics) {
+        try {
+          const weakRes = await fetch('/api/analytics/weak-topics?threshold=50', { credentials: 'include' });
+          const weak = await weakRes.json();
+          if (weak.length === 0) {
+            document.getElementById('practiceContainer').innerHTML = '<div class="bg-white rounded-2xl p-12 text-center text-gray-500">🎉 No weak topics found. Great job!</div>';
+            return;
+          }
+          topics = weak.map(t => t.topic).join(',');
+          document.getElementById('topicBadge').innerHTML = `🎯 Practicing weak topics: ${weak.map(t => t.topic).join(', ')}`;
+        } catch (err) {
+          document.getElementById('practiceContainer').innerHTML = '<p class="text-red-500 text-center">Failed to load topics</p>';
+          return;
+        }
+      } else {
+        document.getElementById('topicBadge').innerHTML = `📚 Practicing: ${decodeURIComponent(topics).replace(/,/g, ', ')}`;
+      }
+
+      try {
+        const res = await fetch(`/api/practice/custom?topics=${encodeURIComponent(topics)}&limit=10`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to load questions');
+        questions = await res.json();
+        if (questions.length === 0) {
+          document.getElementById('practiceContainer').innerHTML = '<div class="bg-white rounded-2xl p-12 text-center text-gray-500">No questions available for these topics yet. Keep solving DPPs!</div>';
+          return;
+        }
+        userAnswers = new Array(questions.length).fill(null);
+        renderSidebar();
+        renderQuestion();
+        renderMath();
+      } catch (err) {
+        console.error(err);
+        document.getElementById('practiceContainer').innerHTML = '<p class="text-red-500 text-center">Error loading questions</p>';
+      }
+    }
+
+    // Render question palette
+    function renderSidebar() {
+      const container = document.getElementById('question-palette');
+      container.innerHTML = '';
+      let answered = 0;
+      for (let i = 0; i < questions.length; i++) {
+        const isAnswered = userAnswers[i] !== null;
+        if (isAnswered) answered++;
+        const btn = document.createElement('button');
+        btn.innerText = i + 1;
+        btn.className = `question-palette-btn w-10 h-10 rounded-full text-sm font-medium transition ${isAnswered ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-gray-100 text-gray-600 border border-gray-200'} ${i === currentIndex ? 'ring-2 ring-blue-500 scale-105' : ''}`;
+        btn.onclick = () => {
+          currentIndex = i;
+          renderQuestion();
+          renderSidebar();
+        };
+        container.appendChild(btn);
+      }
+      document.getElementById('palette-answered').innerText = answered;
+      const percent = (answered / questions.length) * 100;
+      document.getElementById('palette-progress').style.width = `${percent}%`;
+      document.getElementById('answered-count').innerText = `${answered}/${questions.length}`;
+    }
+
+    function renderQuestion() {
+      if (submitted) return;
+      const q = questions[currentIndex];
+      document.getElementById('qNum').innerText = `Q${currentIndex+1}`;
+      document.getElementById('topicTag').innerText = q.topic || 'General';
+      document.getElementById('questionText').innerHTML = q.text;
+      const optsDiv = document.getElementById('optionsList');
+      optsDiv.innerHTML = '';
+      q.options.forEach((opt, i) => {
+        const isSelected = (userAnswers[currentIndex] === i);
+        const optDiv = document.createElement('div');
+        optDiv.className = `option-card rounded-xl p-4 cursor-pointer transition ${isSelected ? 'selected-option' : 'bg-white'}`;
+        optDiv.innerHTML = `<div class="flex items-start gap-3"><span class="font-bold text-blue-600 w-6">${String.fromCharCode(65+i)}.</span><span class="flex-1">${opt}</span></div>`;
+        optDiv.onclick = () => {
+          if (!submitted) {
+            userAnswers[currentIndex] = i;
+            renderQuestion();
+            renderSidebar();
+          }
+        };
+        optsDiv.appendChild(optDiv);
+      });
+      document.getElementById('prevBtn').disabled = (currentIndex === 0);
+      document.getElementById('nextBtn').disabled = (currentIndex === questions.length - 1);
+      renderMath();
+    }
+
+    function renderMath() {
+      if (typeof renderMathInElement !== 'undefined') {
+        renderMathInElement(document.getElementById('questionCard'), {
+          delimiters: [{left: '\\\\(', right: '\\\\)', display: false}, {left: '\\\\[', right: '\\\\]', display: true}]
+        });
+      } else {
+        setTimeout(renderMath, 500);
+      }
+    }
+
+    function nav(delta) {
+      const newIdx = currentIndex + delta;
+      if (newIdx >= 0 && newIdx < questions.length) {
+        currentIndex = newIdx;
+        renderQuestion();
+        renderSidebar();
+      }
+    }
+
+    function resetAnswers() {
+      if (confirm('Reset all answers?')) {
+        userAnswers.fill(null);
+        renderQuestion();
+        renderSidebar();
+      }
+    }
+
+    async function submitPractice() {
+      if (submitted) return;
+      let correct = 0;
+      const results = [];
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        const userAns = userAnswers[i];
+        const isCorrect = (userAns !== null && userAns === q.correctAnswer);
+        if (isCorrect) correct++;
+        results.push({
+          text: q.text,
+          userAnswer: userAns !== null ? String.fromCharCode(65+userAns) : 'Not answered',
+          correctAnswer: String.fromCharCode(65+q.correctAnswer),
+          isCorrect: isCorrect,
+          explanation: q.explanation || ''
+        });
+      }
+      const total = questions.length;
+      const percentage = (correct / total) * 100;
+      document.getElementById('final-score').innerText = correct;
+      document.getElementById('final-total').innerText = total;
+      document.getElementById('res-c').innerText = correct;
+      const inc = total - correct - results.filter(r => r.userAnswer === 'Not answered').length;
+      const unatt = results.filter(r => r.userAnswer === 'Not answered').length;
+      document.getElementById('res-i').innerText = inc;
+      document.getElementById('res-s').innerText = unatt;
+      const attempted = correct + inc;
+      document.getElementById('res-acc').innerText = attempted > 0 ? Math.round((correct / attempted) * 100) + "%" : "0%";
+      document.getElementById('dash-q-count').innerText = total;
+
+      let detailsHtml = '';
+      for (let i = 0; i < results.length; i++) {
+        const r = results[i];
+        const isCorrect = r.isCorrect;
+        const statusClass = isCorrect ? 'text-green-600 bg-green-50' : (r.userAnswer !== 'Not answered' ? 'text-red-600 bg-red-50' : 'text-gray-500 bg-gray-50');
+        const statusIcon = isCorrect ? '<i class="fas fa-check-circle mr-1"></i>' : (r.userAnswer !== 'Not answered' ? '<i class="fas fa-times-circle mr-1"></i>' : '<i class="fas fa-question-circle mr-1"></i>');
+        const statusText = isCorrect ? 'Correct' : (r.userAnswer !== 'Not answered' ? 'Incorrect' : 'Not Answered');
+        detailsHtml += `
+          <div class="result-question-card bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="p-5">
+              <div class="flex justify-between items-start flex-wrap gap-2">
+                <div class="flex items-center gap-3">
+                  <span class="text-sm font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-full">Q${i+1}</span>
+                  <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusClass}">${statusIcon} ${statusText}</span>
+                </div>
+                ${r.explanation ? `<button class="expand-btn text-blue-500 hover:text-blue-700 text-sm focus:outline-none" data-idx="${i}"><i class="fas fa-chevron-down"></i> Show Explanation</button>` : ''}
+              </div>
+              <div class="mt-3 text-gray-800 font-medium">${escapeHtml(r.text.substring(0, 200))}${r.text.length > 200 ? '...' : ''}</div>
+              <div class="mt-2 text-sm">
+                <span class="font-semibold">Your answer:</span> <span class="${isCorrect ? 'text-green-600' : (r.userAnswer !== 'Not answered' ? 'text-red-600' : 'text-gray-500')}">${escapeHtml(r.userAnswer)}</span>
+                <span class="mx-2">|</span>
+                <span class="font-semibold">Correct answer:</span> <span class="text-green-600">${escapeHtml(r.correctAnswer)}</span>
+              </div>
+              ${r.explanation ? `
+                <div class="explanation-content mt-3 pt-3 border-t border-gray-100 text-sm text-gray-600" id="exp-${i}">
+                  <div class="flex items-start gap-2">
+                    <i class="fas fa-lightbulb text-yellow-500 mt-0.5"></i>
+                    <div>${escapeHtml(r.explanation)}</div>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          </div>`;
+      }
+      document.getElementById('detailedResults').innerHTML = detailsHtml;
+      document.querySelectorAll('.expand-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const idx = btn.getAttribute('data-idx');
+          const expDiv = document.getElementById(`exp-${idx}`);
+          if (expDiv) {
+            expDiv.classList.toggle('show');
+            const icon = btn.querySelector('i');
+            if (expDiv.classList.contains('show')) {
+              icon.classList.remove('fa-chevron-down');
+              icon.classList.add('fa-chevron-up');
+              btn.innerHTML = '<i class="fas fa-chevron-up"></i> Hide Explanation';
+            } else {
+              icon.classList.remove('fa-chevron-up');
+              icon.classList.add('fa-chevron-down');
+              btn.innerHTML = '<i class="fas fa-chevron-down"></i> Show Explanation';
+            }
+          }
+        });
+      });
+      document.getElementById('practiceContainer').classList.add('hidden');
+      document.getElementById('resultsCard').classList.remove('hidden');
+      submitted = true;
+    }
+
+    // Mobile sidebar toggle
+    document.getElementById('mobile-toggle')?.addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('open');
+    });
+    // Close sidebar when clicking a palette button on mobile (optional)
+    document.addEventListener('click', (e) => {
+      if (window.innerWidth < 768 && e.target.closest('.question-palette-btn')) {
+        document.getElementById('sidebar').classList.remove('open');
+      }
+    });
+
+    document.getElementById('prevBtn').addEventListener('click', () => nav(-1));
+    document.getElementById('nextBtn').addEventListener('click', () => nav(1));
+    document.getElementById('resetBtn').addEventListener('click', resetAnswers);
+    document.getElementById('submitBtn').addEventListener('click', submitPractice);
+
+    async function logout() {
+      await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+      window.location.href = '/login.html';
+    }
+
+    window.onload = loadPractice;
+  </script>
+</body>
+</html>
