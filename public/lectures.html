@@ -22,6 +22,54 @@
     .sidebar {
       transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
     }
+    /* Remark tooltip container */
+    .remark-tooltip-wrapper {
+      position: relative;
+      display: inline-flex;
+    }
+
+    /* The tooltip itself */
+    .remark-tooltip {
+      position: absolute;
+      right: calc(100% + 12px);   /* space between button and tooltip */
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(17, 24, 39, 0.92);   /* dark glass */
+      backdrop-filter: blur(12px);
+      color: #f9fafb;
+      font-size: 0.8rem;
+      line-height: 1.4;
+      padding: 10px 14px;
+      border-radius: 12px;
+      max-width: 220px;
+      width: max-content;
+      white-space: pre-wrap;            /* respects line breaks in remark */
+      word-break: break-word;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+      pointer-events: none;            /* doesn't block the button itself */
+      z-index: 50;
+    }
+
+    /* Arrow pointing right (towards the button) */
+    .remark-tooltip::after {
+      content: '';
+      position: absolute;
+      left: 100%;
+      top: 50%;
+      transform: translateY(-50%);
+      border: 6px solid transparent;
+      border-left-color: rgba(17, 24, 39, 0.92);
+    }
+
+    /* Show tooltip on hover */
+    .remark-tooltip-wrapper:hover .remark-tooltip {
+      opacity: 1;
+      visibility: visible;
+    }
     @media (max-width: 768px) {
       .sidebar {
         position: fixed;
@@ -481,9 +529,7 @@
       <input id="lecture-youtube" type="text" placeholder="YouTube Video ID" class="w-full border border-gray-300 rounded-2xl px-5 py-4">
       <input id="lecture-image" type="text" placeholder="Instructor Image URL (optional)" class="w-full border border-gray-300 rounded-2xl px-5 py-4">
       <input id="lecture-pdf" type="text" placeholder="Class PDF Link (Google Drive)" class="w-full border border-gray-300 rounded-2xl px-5 py-4">
-      <input id="lecture-pdf" type="text" placeholder="Class PDF Link (Google Drive)" class="w-full border border-gray-300 rounded-2xl px-5 py-4">
       <input id="lecture-dpp" type="text" placeholder="DPP Link (Google Drive)" class="w-full border border-gray-300 rounded-2xl px-5 py-4">   <!-- NEW -->
-      <input id="lecture-printable" type="text" placeholder="Printable Notes Link (optional)" class="w-full border border-gray-300 rounded-2xl px-5 py-4">
       <input id="lecture-printable" type="text" placeholder="Printable Notes Link (optional)" class="w-full border border-gray-300 rounded-2xl px-5 py-4">
       <textarea id="lecture-remark" rows="2" placeholder="Remark / Admin note (optional)" class="w-full border border-gray-300 rounded-2xl px-5 py-4"></textarea>
     </div>
@@ -499,9 +545,7 @@
       <input id="update-youtube" type="text" placeholder="YouTube Video ID (optional)" class="w-full border border-gray-300 rounded-2xl px-5 py-4">
       <input id="update-image" type="text" placeholder="Instructor Image URL (optional)" class="w-full border border-gray-300 rounded-2xl px-5 py-4">
       <input id="update-pdf" type="text" placeholder="Class PDF Link (Google Drive)" class="w-full border border-gray-300 rounded-2xl px-5 py-4">
-      <input id="update-pdf" type="text" placeholder="Class PDF Link (Google Drive)" class="w-full border border-gray-300 rounded-2xl px-5 py-4">
       <input id="update-dpp" type="text" placeholder="DPP Link (Google Drive)" class="w-full border border-gray-300 rounded-2xl px-5 py-4">   <!-- NEW -->
-      <input id="update-printable" type="text" placeholder="Printable Notes Link" class="w-full border border-gray-300 rounded-2xl px-5 py-4">
       <input id="update-printable" type="text" placeholder="Printable Notes Link" class="w-full border border-gray-300 rounded-2xl px-5 py-4">
       <textarea id="update-remark" rows="2" placeholder="Remark / Admin note" class="w-full border border-gray-300 rounded-2xl px-5 py-4"></textarea>
     </div>
@@ -706,12 +750,34 @@ function renderLectures(lectures) {
     const lectureId = lec._id;
     const pdfLink = lec.pdfLink || '';
     const hasDpp = lec.hasDpp === true;
+    const printableLink = lec.printableNotesLink || '';
+    const hasAnyResource = (pdfLink && pdfLink.trim() !== '') || hasDpp || (printableLink && printableLink.trim() !== '');
 
-    // ✅ DPP BADGE – only if hasDpp is true
+    // Green DPP badge
     const dppBadge = hasDpp
       ? `<span class="inline-flex items-center gap-1 ml-2 px-2 py-0.5 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
            <i class="fa-solid fa-file-lines text-[10px]"></i> DPP
          </span>`
+      : '';
+
+    // Resources button – disabled if no resource at all
+    let resourceBtn = '';
+    if (hasAnyResource) {
+      resourceBtn = `<button onclick="openResourceModal('${lectureId}', '${pdfLink.replace(/'/g, "\\'")}', ${hasDpp}, '${printableLink.replace(/'/g, "\\'")}')" class="w-32 border-2 border-gray-300 hover:border-gray-400 hover:bg-gray-50 py-2.5 rounded-2xl text-sm font-medium flex items-center justify-center gap-2">
+        <i class="fa-solid fa-folder-open"></i> Resources
+      </button>`;
+    } else {
+      resourceBtn = `<button disabled class="w-32 bg-gray-100 text-gray-400 py-2.5 rounded-2xl text-sm font-medium cursor-not-allowed">No Resources</button>`;
+    }
+
+    // Remark button (i) – exactly like before
+    const remarkBtn = lec.remark
+      ? `<div class="remark-tooltip-wrapper ml-auto">
+          <button onclick="showRemarkModal('${lec.remark.replace(/'/g, "\\'")}')" class="text-gray-400 hover:text-blue-500 text-xl" title="">
+            <i class="fa-solid fa-circle-info"></i>
+          </button>
+          <div class="remark-tooltip">${lec.remark.replace(/`/g, '\\`').replace(/\$/g, '\\$')}</div>
+        </div>`
       : '';
 
     html += `
@@ -728,9 +794,10 @@ function renderLectures(lectures) {
             </div>
             <button onclick="markLectureComplete('${lec._id}')" class="w-9 h-9 flex items-center justify-center rounded-full border-2 flex-shrink-0 ${isCompleted ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 hover:border-green-500 hover:bg-green-50'}">${isCompleted ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-check text-gray-400"></i>'}</button>
           </div>
-          <div class="flex gap-3 mt-5">
-            <button onclick="playVideo('${lec.youtubeId || ''}')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-2xl text-sm font-medium flex items-center justify-center gap-2"><i class="fa-solid fa-play"></i> Watch</button>
-            <button onclick="showNotesModal('${lectureId}', '${pdfLink}', ${hasDpp})" class="flex-1 border-2 border-gray-300 hover:border-gray-400 hover:bg-gray-50 py-2.5 rounded-2xl text-sm font-medium flex items-center justify-center gap-2"><i class="fa-solid fa-book-open"></i> Notes & More</button>
+          <div class="flex gap-3 mt-5 items-center">
+            <button onclick="playVideo('${lec.youtubeId || ''}')" class="w-32 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-2xl text-sm font-medium flex items-center justify-center gap-2"><i class="fa-solid fa-play"></i> Watch</button>
+            ${resourceBtn}
+            ${remarkBtn}
           </div>
         </div>
       </div>`;
@@ -1412,14 +1479,20 @@ async function populateUpdateLectureSelect() {
 async function loadLectureForUpdate() {
   const lectureId = document.getElementById('update-lecture-select').value;
   if(!lectureId) return;
-  try { const res = await fetch(`/api/lectures/${lectureId}`, { credentials: 'include' }); if(!res.ok) throw new Error(); const lec = await res.json();
+  try {
+    const res = await fetch(`/api/lectures/${lectureId}`, { credentials: 'include' });
+    if(!res.ok) throw new Error();
+    const lec = await res.json();
     document.getElementById('update-title').value = lec.title || '';
     document.getElementById('update-youtube').value = lec.youtubeId || '';
     document.getElementById('update-image').value = lec.imageUrl || '';
     document.getElementById('update-pdf').value = lec.pdfLink || '';
+    document.getElementById('update-dpp').value = lec.dppLink || '';          // ✅ NEW
     document.getElementById('update-printable').value = lec.printableNotesLink || '';
     document.getElementById('update-remark').value = lec.remark || '';
-  } catch(e) { showToast("Could not load lecture details.", "error"); }
+  } catch(e) {
+    showToast("Could not load lecture details.", "error");
+  }
 }
 async function executeManageAction() {
   if (!isAdmin) { showToast("Please login as Admin first", "error"); hideManageModal(); return; }
@@ -1462,6 +1535,7 @@ async function executeManageAction() {
         document.getElementById('lecture-image').value = '';
         document.getElementById('lecture-pdf').value = '';
         document.getElementById('lecture-printable').value = '';
+        document.getElementById('lecture-dpp').value = '';
         document.getElementById('lecture-remark').value = '';
         await loadData();
       } else showToast(data.msg || "Failed to add lecture", "error");
@@ -1496,22 +1570,32 @@ async function executeManageAction() {
       const youtubeId = document.getElementById('update-youtube').value.trim();
       const imageUrl = document.getElementById('update-image').value.trim();
       const pdfLink = document.getElementById('update-pdf').value.trim();
+      const dppLink = document.getElementById('update-dpp').value.trim();        // ✅ NEW
       const printableNotesLink = document.getElementById('update-printable').value.trim();
       const remark = document.getElementById('update-remark').value.trim();
       if (title) updateData.title = title;
       if (youtubeId) updateData.youtubeId = youtubeId;
       if (imageUrl) updateData.imageUrl = imageUrl;
       if (pdfLink) updateData.pdfLink = pdfLink;
+      if (dppLink) updateData.dppLink = dppLink;                                // ✅ NEW
       if (printableNotesLink) updateData.printableNotesLink = printableNotesLink;
       if (remark) updateData.remark = remark;
-      const res = await fetch(`/api/lectures/${lectureId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updateData), credentials: 'include' });
+
+      const res = await fetch(`/api/lectures/${lectureId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
+        credentials: 'include'
+      });
       const data = await res.json();
       if (res.ok) {
         showToast("Lecture updated successfully!", "success");
+        // clear all fields
         document.getElementById('update-title').value = '';
         document.getElementById('update-youtube').value = '';
         document.getElementById('update-image').value = '';
         document.getElementById('update-pdf').value = '';
+        document.getElementById('update-dpp').value = '';                        // ✅ NEW
         document.getElementById('update-printable').value = '';
         document.getElementById('update-remark').value = '';
         await loadData();
@@ -1551,10 +1635,9 @@ function openResourceModal(lectureId, pdfLink, hasDpp, printableLink) {
     const container = document.getElementById('resource-options');
     if (!modal || !container) return;
 
-    // Clear previous options
     container.innerHTML = '';
 
-    // Add "Class PDF" button if link exists
+    // Class PDF button
     if (pdfLink && pdfLink.trim() !== '') {
         const pdfBtn = document.createElement('button');
         pdfBtn.className = 'w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-2xl font-medium flex items-center justify-center gap-2';
@@ -1566,7 +1649,7 @@ function openResourceModal(lectureId, pdfLink, hasDpp, printableLink) {
         container.appendChild(pdfBtn);
     }
 
-    // Add "Printable Notes" button if link exists
+    // Printable Notes button
     if (printableLink && printableLink.trim() !== '') {
         const notesBtn = document.createElement('button');
         notesBtn.className = 'w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-2xl font-medium flex items-center justify-center gap-2';
@@ -1578,13 +1661,22 @@ function openResourceModal(lectureId, pdfLink, hasDpp, printableLink) {
         container.appendChild(notesBtn);
     }
 
-    // Optional: DPP button – if you add a dppLink field later
-    // For now, ignore hasDpp or show a message if no resources
+    // DPP button – only if the lecture has a DPP (hasDpp === true)
+    if (hasDpp === true) {
+        const dppBtn = document.createElement('button');
+        dppBtn.className = 'w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-2xl font-medium flex items-center justify-center gap-2';
+        dppBtn.innerHTML = '<i class="fa-solid fa-puzzle-piece"></i> DPP';
+        dppBtn.onclick = () => {
+            window.location.href = `/dpp-viewer.html?lectureId=${lectureId}`;
+            closeResourceModal();
+        };
+        container.appendChild(dppBtn);
+    }
+
     if (container.children.length === 0) {
         container.innerHTML = '<p class="text-center text-gray-500 py-4">No resources available for this lecture.</p>';
     }
 
-    // Show the modal
     modal.classList.remove('hidden');
 }
 window.onload = async () => { await checkAuth(); await loadData(); };

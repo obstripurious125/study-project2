@@ -263,6 +263,49 @@
       transition: opacity 0.15s;
     }
     .speed-indicator.active { opacity: 1; }
+    /* YouTube‑style skip animation */
+    .yt-skip {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 50;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      width: 110px;
+      height: 110px;
+    }
+    .yt-skip.active {
+      opacity: 1;
+    }
+    .yt-skip-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      transform: rotate(-90deg);   /* start from top */
+    }
+    .yt-skip-icon {
+      color: white;
+      font-size: 2.8rem;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+      z-index: 2;
+      position: relative;
+    }
+    .yt-skip-text {
+      color: white;
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-top: 2px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      letter-spacing: 0.3px;
+    }
 
     .loading-spinner {
       width: 48px; height: 48px;
@@ -467,6 +510,21 @@
           <div id="errorText">Loading video ...</div>
         </div>
         <div class="speed-indicator" id="speedIndicator">2×</div>
+        <!-- YouTube‑style skip animation -->
+        <div class="yt-skip" id="ytSkip">
+          <svg class="yt-skip-ring" viewBox="0 0 120 120">
+            <circle class="yt-skip-ring-bg" cx="60" cy="60" r="54"
+                    fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="5" />
+            <circle class="yt-skip-ring-progress" cx="60" cy="60" r="54"
+                    fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"
+                    stroke-dasharray="339.292" stroke-dashoffset="339.292"
+                    id="ytSkipRingProgress" />
+          </svg>
+          <div class="yt-skip-icon" id="ytSkipIcon">
+            <i class="fas fa-forward"></i>
+          </div>
+          <span class="yt-skip-text">10 s</span>
+        </div>
       </div>
       <div class="custom-controls" id="customControls">
         <button class="ctrl-btn" id="playPauseBtn"><i class="fas fa-pause"></i></button>
@@ -874,28 +932,71 @@
       customControls.addEventListener('mouseleave', resetControlsHideTimer);
     }
 
-    // YouTube-style click on overlay: left/right skip, middle play/pause
+    // YouTube-style tap skip with authentic overlay animation
     overlayVideo.addEventListener('click', (e) => {
       if (!player || !playerReady) return;
       const rect = videoStageContainer.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
       const width = rect.width;
+
       if (clickX < width / 3) {
+        // skip back 10s
         const newTime = Math.max(0, player.getCurrentTime() - 10);
         player.seekTo(newTime, true);
         updateTimeDisplay();
-        showToast('⏪ -10 sec', 'info');
+        triggerYtSkip('backward');
       } else if (clickX > (width * 2 / 3)) {
+        // skip forward 10s
         const duration = player.getDuration();
         const newTime = Math.min(duration, player.getCurrentTime() + 10);
         player.seekTo(newTime, true);
         updateTimeDisplay();
-        showToast('⏩ +10 sec', 'info');
+        triggerYtSkip('forward');
       } else {
+        // play / pause
         (player.getPlayerState() === YT.PlayerState.PLAYING) ? player.pauseVideo() : player.playVideo();
       }
       showControls();
     });
+
+    function triggerYtSkip(direction) {
+      const container = document.getElementById('ytSkip');
+      const ringProgress = document.getElementById('ytSkipRingProgress');
+      const iconEl = document.getElementById('ytSkipIcon');
+      const textEl = container.querySelector('.yt-skip-text');
+      const circumference = 339.292;   // 2*π*54
+
+      // Set icon and text
+      if (direction === 'forward') {
+        iconEl.innerHTML = '<i class="fas fa-forward"></i>';
+        textEl.innerText = '10 s';
+      } else {
+        iconEl.innerHTML = '<i class="fas fa-backward"></i>';
+        textEl.innerText = '10 s';
+      }
+
+      // Reset ring to empty
+      ringProgress.style.transition = 'none';
+      ringProgress.style.strokeDashoffset = circumference;
+      // Show container
+      container.classList.add('active');
+
+      // Force a reflow so the reset stroke-dashoffset is painted
+      ringProgress.getBoundingClientRect();
+
+      // Animate ring filling over 300ms
+      ringProgress.style.transition = 'stroke-dashoffset 0.3s ease-out';
+      ringProgress.style.strokeDashoffset = '0';
+
+      // Hide after animation completes + a tiny delay
+      clearTimeout(container._hideTimeout);
+      container._hideTimeout = setTimeout(() => {
+        container.classList.remove('active');
+        // Reset ring to empty again for next time
+        ringProgress.style.transition = 'none';
+        ringProgress.style.strokeDashoffset = circumference;
+      }, 400);
+    }
 
     function destroyPlayer() {
       if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
