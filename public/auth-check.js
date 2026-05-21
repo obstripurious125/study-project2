@@ -9,3 +9,8 @@
         window.location.href = '/login.html';
     }
 })();
+// Disable right-click context menu site-wide
+document.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    return false;
+});
