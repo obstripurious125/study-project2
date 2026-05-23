@@ -1,46 +1,53 @@
-const CACHE_NAME = 'my-pw-v2'; // 🔁 bump version to force cache refresh
-const urlsToCache = [
+const CACHE_NAME = 'study-cache-v2';
+const ASSETS_TO_CACHE = [
+  '/',
+  '/auth-check.js',
   '/manifest.json',
   '/icons/icon-192.png',
-  '/icons/icon-512.png'
-  // 🚫 NO HTML files – we want them always fresh from network
+  '/icons/icon-512.png',
+  // Add any other crucial pages/assets you want available offline
 ];
 
+// Install event – cache essential files
 self.addEventListener('install', event => {
+  console.log('Service Worker installing.');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Opened cache');
-        return cache.addAll(urlsToCache);
+        return cache.addAll(ASSETS_TO_CACHE);
       })
+      .catch(err => console.error('Cache addAll failed', err))
   );
 });
 
-// 🆕 Network-first strategy for HTML, cache for assets
-self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-  
-  // For HTML pages, always go to network (no cache)
-  if (event.request.mode === 'navigate' || url.pathname.endsWith('.html')) {
-    event.respondWith(fetch(event.request));
-    return;
-  }
-  
-  // For other assets, try cache first, then network
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
-  );
-});
-
-// 🆕 Clean up old caches
+// Activate event – clean old caches
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(cacheNames => {
+    caches.keys().then(keys => {
       return Promise.all(
-        cacheNames.filter(name => name !== CACHE_NAME)
-          .map(name => caches.delete(name))
+        keys.filter(key => key !== CACHE_NAME)
+            .map(key => caches.delete(key))
       );
     })
+  );
+});
+
+// Fetch event – network first, fallback to cache
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    fetch(event.request)
+      .then(response => {
+        // Cache the fresh response
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, clone);
+        });
+        return response;
+      })
+      .catch(() => {
+        // Offline – return cached version if available
+        return caches.match(event.request);
+      })
   );
 });
