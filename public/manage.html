@@ -318,6 +318,7 @@
     <script>
         let allSubjects = [];
         let allLectures = [];
+        let lecturesWithDpp = new Set();   // NEW: stores lecture IDs that already have a DPP
 
         // ========== AUTHENTICATION ==========
         async function checkAdminAuth() {
@@ -382,6 +383,7 @@
             // Clear any sensitive data from memory
             allSubjects = [];
             allLectures = [];
+            lecturesWithDpp.clear();
         });
 
         // ========== MANAGEMENT INITIALIZATION ==========
@@ -403,7 +405,7 @@
             loadSubjectsAndLectures();
         }
 
-        // ========== LOAD SUBJECTS & LECTURES ==========
+        // ========== LOAD SUBJECTS & LECTURES (UPDATED: fetch existing DPPs) ==========
         async function loadSubjectsAndLectures() {
             try {
                 const subRes = await fetch('/api/subjects', { credentials: 'include' });
@@ -420,12 +422,25 @@
                 const lecRes = await fetch('/api/lectures', { credentials: 'include' });
                 if (!lecRes.ok) throw new Error('Failed to load lectures');
                 allLectures = await lecRes.json();
+
+                // 🆕 Fetch existing DPPs to know which lectures already have one
+                try {
+                    const dppRes = await fetch('/api/dpp/lectures', { credentials: 'include' });
+                    if (dppRes.ok) {
+                        const dppList = await dppRes.json();
+                        lecturesWithDpp.clear();
+                        dppList.forEach(dpp => lecturesWithDpp.add(dpp.lectureId));
+                    }
+                } catch (err) {
+                    console.warn('Could not fetch DPP list:', err);
+                }
             } catch (err) {
                 console.error(err);
                 alert('Error loading data. Make sure you are logged in as admin.');
             }
         }
 
+        // 🆕 UPDATED: show warning in dropdown if DPP exists
         document.getElementById('quick-subject-select').addEventListener('change', (e) => {
             const subjectId = e.target.value;
             const lectureSelect = document.getElementById('quick-lecture-select');
@@ -436,7 +451,9 @@
                 filtered.forEach(lec => {
                     const opt = document.createElement('option');
                     opt.value = lec._id;
-                    opt.textContent = lec.title;
+                    const hasDpp = lecturesWithDpp.has(lec._id.toString());
+                    opt.textContent = lec.title + (hasDpp ? ' ⚠️ DPP exists' : '');
+                    if (hasDpp) opt.style.color = '#d97706';
                     lectureSelect.appendChild(opt);
                 });
                 if (filtered.length === 0) {
@@ -449,7 +466,7 @@
             }
         });
 
-        // ========== QUICK UPLOAD ==========
+        // ========== QUICK UPLOAD (UPDATED: confirmation before overwrite) ==========
         function setupQuickUpload() {
             document.getElementById('quick-upload-btn').addEventListener('click', async () => {
                 const lectureId = document.getElementById('quick-lecture-select').value;
@@ -462,6 +479,15 @@
                 if (!Array.isArray(questions)) { alert('Questions must be an array'); return; }
                 const selectedLecture = allLectures.find(l => l._id === lectureId);
                 const selectedSubject = allSubjects.find(s => (s._id || s.id) === document.getElementById('quick-subject-select').value);
+
+                // 🆕 Check if DPP already exists
+                const hasDpp = lecturesWithDpp.has(lectureId);
+                if (hasDpp) {
+                    if (!confirm(`⚠️ Lecture "${selectedLecture.title}" already has a DPP. Uploading will OVERWRITE it. Continue?`)) {
+                        return;
+                    }
+                }
+
                 const payload = {
                     lectureId: lectureId,
                     lectureName: selectedLecture.title,
@@ -487,6 +513,13 @@
                                               <p class="text-sm mt-1">Lecture: ${selectedLecture.title}</p>
                                               <p class="text-sm">Questions: ${questions.length}</p>`;
                         document.getElementById('quick-questions').value = '';
+                        // 🆕 Update the set and dropdown option
+                        lecturesWithDpp.add(lectureId);
+                        const opt = document.querySelector(`#quick-lecture-select option[value="${lectureId}"]`);
+                        if (opt && !opt.textContent.includes('⚠️')) {
+                            opt.textContent = selectedLecture.title + ' ⚠️ DPP exists';
+                            opt.style.color = '#d97706';
+                        }
                     } else {
                         resultDiv.className = 'mt-4 p-4 bg-red-50 border border-red-300 rounded';
                         resultDiv.innerHTML = `<p class="font-medium text-red-800">❌ Upload failed</p>
@@ -503,7 +536,7 @@
             });
         }
 
-        // ========== JSON UPLOAD ==========
+        // ========== JSON UPLOAD (UPDATED: confirmation before overwrite) ==========
         function setupJsonUpload() {
             const fileInput = document.getElementById('json-file');
             const selectBtn = document.getElementById('select-file-btn');
@@ -521,6 +554,20 @@
                 reader.onload = async (e) => {
                     try {
                         const json = JSON.parse(e.target.result);
+                        // 🆕 Check for existing DPP before uploading
+                        const lectureId = json.lectureId;
+                        let shouldProceed = true;
+                        if (lectureId && lecturesWithDpp.has(lectureId)) {
+                            const lectureName = allLectures.find(l => l._id === lectureId)?.title || lectureId;
+                            shouldProceed = confirm(`⚠️ Lecture "${lectureName}" already has a DPP. Overwrite?`);
+                        } else if (json.lectureName && !lectureId) {
+                            const found = allLectures.find(l => l.title === json.lectureName);
+                            if (found && lecturesWithDpp.has(found._id)) {
+                                shouldProceed = confirm(`⚠️ Lecture "${json.lectureName}" already has a DPP. Overwrite?`);
+                            }
+                        }
+                        if (!shouldProceed) return;
+
                         uploadBtn.disabled = true;
                         uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Uploading...';
                         const res = await fetch('/api/dpp/upload', {
@@ -533,6 +580,18 @@
                         resultDiv.classList.remove('hidden');
                         resultDiv.querySelector('pre').textContent = JSON.stringify(data, null, 2);
                         resultDiv.className = res.ok ? 'mt-4 p-4 bg-green-50 rounded border border-green-300' : 'mt-4 p-4 bg-red-50 rounded border border-red-300';
+                        if (res.ok && lectureId) {
+                            // 🆕 Update set and dropdown after successful upload
+                            lecturesWithDpp.add(lectureId);
+                            const opt = document.querySelector(`#quick-lecture-select option[value="${lectureId}"]`);
+                            if (opt && !opt.textContent.includes('⚠️')) {
+                                const lec = allLectures.find(l => l._id === lectureId);
+                                if (lec) {
+                                    opt.textContent = lec.title + ' ⚠️ DPP exists';
+                                    opt.style.color = '#d97706';
+                                }
+                            }
+                        }
                     } catch (err) {
                         alert('Invalid JSON: ' + err.message);
                     } finally {
@@ -544,7 +603,7 @@
             });
         }
 
-        // ========== QUESTION EDITOR (improved with live preview) ==========
+        // ========== QUESTION EDITOR (UPDATED: remove warning from dropdown on delete) ==========
         async function loadEditorLectures() {
             const select = document.getElementById('editor-lecture-select');
             if (!select) return;
@@ -563,7 +622,7 @@
             }
         }
 
-        // Delete DPP (unchanged)
+        // Delete DPP (UPDATED: remove from set and update dropdown)
         document.getElementById('delete-dpp-btn').addEventListener('click', async () => {
             const select = document.getElementById('editor-lecture-select');
             const lectureId = select.value;
@@ -584,6 +643,14 @@
                 const data = await res.json();
                 if (res.ok) {
                     alert(`✅ DPP for "${lectureName}" deleted successfully.`);
+                    // 🆕 Remove from set and update quick upload dropdown
+                    lecturesWithDpp.delete(lectureId);
+                    const quickSelect = document.getElementById('quick-lecture-select');
+                    const opt = quickSelect.querySelector(`option[value="${lectureId}"]`);
+                    if (opt) {
+                        opt.textContent = lectureName.replace(' ⚠️ DPP exists', '');
+                        opt.style.color = '';
+                    }
                     const container = document.getElementById('editor-form-container');
                     if (container) container.innerHTML = '';
                     select.remove(select.selectedIndex);
@@ -596,7 +663,7 @@
             }
         });
 
-        // Load DPP and render improved editor form
+        // Load DPP and render improved editor form (unchanged)
         document.getElementById('editor-lecture-select').addEventListener('change', async (e) => {
             const lectureId = e.target.value;
             const container = document.getElementById('editor-form-container');
@@ -794,7 +861,7 @@
         // Start the app: check if already logged in
         checkAdminAuth();
 
-        // ========== MOTIVATION SCHEDULE FUNCTIONS ==========
+        // ========== MOTIVATION SCHEDULE FUNCTIONS (unchanged) ==========
         async function loadMotivationSchedule() {
             try {
                 const res = await fetch('/api/motivation', { credentials: 'include' });
