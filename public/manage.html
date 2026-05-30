@@ -443,7 +443,9 @@
                 } catch (err) {
                     resultDiv.classList.remove('hidden');
                     resultDiv.className = 'mt-4 p-4 bg-red-50 border border-red-300 rounded';
-                    resultDiv.innerHTML = `<p class="font-medium text-red-800">❌ Network error</p>`;
+                    resultDiv.innerHTML = `<p class="font-medium text-red-800">❌ Request failed</p>
+                                        <p class="text-sm">${err.message}</p>`;
+
                 } finally {
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fas fa-cloud-upload-alt mr-2"></i>Upload DPP';

@@ -70,6 +70,11 @@
             white-space: normal;
             color: #222;
         }
+        /* Ensure images in questions are responsive */
+        #q-text img, .option img {
+            max-width: 100%;
+            height: auto;
+        }
         #test-interface {
             display: flex;
             flex-direction: column;
@@ -360,7 +365,6 @@
             color: var(--pw-blue);
             margin-left: 15px;
         }
-        /* LaTeX hint styling */
         .math-hint {
             background: #fef9e3;
             border-left: 3px solid #f59e0b;
@@ -534,7 +538,17 @@
 </div>
 
 <script>
-    // ---------- XSS Prevention: Escape HTML ----------
+    // ---------- Helper: clean HTML (remove <style> and <script> tags) ----------
+    function cleanHtml(html) {
+        if (!html) return '';
+        // Remove <style> tags and their contents
+        html = html.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+        // Remove <script> tags for safety
+        html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+        return html;
+    }
+
+    // ---------- XSS Prevention: Escape HTML (for user input only) ----------
     function escapeHtml(text) {
         if (!text) return '';
         return text
@@ -565,14 +579,6 @@
         } else {
             setTimeout(() => renderMathInContainer(container), 100);
         }
-    }
-
-    // Apply math rendering to the entire question view
-    function applyMathRendering() {
-        const qText = document.getElementById('q-text');
-        if (qText) renderMathInContainer(qText);
-        const options = document.querySelectorAll('.option');
-        options.forEach(opt => renderMathInContainer(opt));
     }
 
     // ---------- GLOBAL STATE ----------
@@ -656,7 +662,7 @@
     async function loadDpp(lectureId) {
         if (!lectureId) return;
 
-        document.getElementById('q-text').innerText = 'Loading questions...';
+        document.getElementById('q-text').innerHTML = 'Loading questions...';
         document.getElementById('options').innerHTML = '';
 
         try {
@@ -705,7 +711,12 @@
     function renderQuestion() {
         if (!questions.length) return;
         const q = questions[current];
-        document.getElementById('q-text').innerText = q.text;
+
+        // Render question text as HTML (cleaned)
+        const qTextEl = document.getElementById('q-text');
+        qTextEl.innerHTML = cleanHtml(q.text);
+        renderMathInContainer(qTextEl);
+
         document.getElementById('q-num-box').innerText = current + 1;
         document.getElementById('date-badge').innerText = q.date ? `PYQ ${q.date}` : '';
         const label = document.getElementById('difficulty-label');
@@ -723,7 +734,9 @@
                 if (i === q.ans) div.classList.add('correct');
                 else if (userAnswers[current] === i) div.classList.add('wrong');
             }
-            div.innerText = (i + 1) + ". " + opt;
+            // Use innerHTML with cleaned option text
+            div.innerHTML = `<span style="font-weight:500">${i+1}.</span> ${cleanHtml(opt)}`;
+            renderMathInContainer(div);
             div.onclick = () => {
                 if (states[current] !== 'checked') {
                     userAnswers[current] = i;
@@ -733,14 +746,10 @@
                 }
             };
             optDiv.appendChild(div);
-            renderMathInContainer(div);
         });
 
         document.getElementById('prev-btn').disabled = (current === 0);
         document.getElementById('next-btn').disabled = (current === questions.length - 1);
-
-        const qTextEl = document.getElementById('q-text');
-        if (qTextEl) renderMathInContainer(qTextEl);
     }
 
     function updatePalette() {
@@ -941,6 +950,9 @@
             const statusIcon = isCorrect ? '<i class="fas fa-check-circle mr-1"></i>' : (userAns !== null ? '<i class="fas fa-times-circle mr-1"></i>' : '<i class="fas fa-question-circle mr-1"></i>');
             const statusText = isCorrect ? 'Correct' : (userAns !== null ? 'Incorrect' : 'Not Answered');
 
+            // Clean the question text for display (remove style tags, keep formatting)
+            const cleanedQuestionText = cleanHtml(q.text);
+
             detailsHtml += `
                 <div class="result-question-card bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                     <div class="p-5">
@@ -955,7 +967,7 @@
                                 <i class="fas fa-chevron-down"></i> Show Explanation
                             </button>
                         </div>
-                        <div class="mt-3 text-gray-800 font-medium">${escapeHtml(q.text.substring(0, 200))}${q.text.length > 200 ? '...' : ''}</div>
+                        <div class="mt-3 text-gray-800 font-medium">${cleanedQuestionText.substring(0, 200)}${cleanedQuestionText.length > 200 ? '...' : ''}</div>
                         <div class="mt-2 text-sm">
                             <span class="font-semibold">Your answer:</span> <span class="${isCorrect ? 'text-green-600' : (userAns !== null ? 'text-red-600' : 'text-gray-500')}">${userLetter}</span>
                             <span class="mx-2">|</span>
@@ -965,7 +977,7 @@
                         <div class="explanation-content mt-3 pt-3 border-t border-gray-100 text-sm text-gray-600" id="exp-${i}">
                             <div class="flex items-start gap-2">
                                 <i class="fas fa-lightbulb text-yellow-500 mt-0.5"></i>
-                                <div>${escapeHtml(explanation)}</div>
+                                <div>${cleanHtml(explanation)}</div>
                             </div>
                         </div>
                         ` : ''}
@@ -976,6 +988,9 @@
 
         const detailedContainer = document.getElementById('detailedResults');
         detailedContainer.innerHTML = detailsHtml;
+
+        // Re-render math in the detailed results (in case explanations contain LaTeX)
+        renderMathInContainer(detailedContainer);
 
         // Attach expand/collapse handlers
         document.querySelectorAll('.expand-btn').forEach(btn => {
