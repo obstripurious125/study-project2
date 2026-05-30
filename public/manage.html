@@ -6,6 +6,10 @@
     <title>DPP Manager - Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- KaTeX for preview -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js"></script>
     <style>
         .tab-btn.active {
             background-color: white;
@@ -34,6 +38,57 @@
             text-align: center;
         }
         .hidden { display: none; }
+        /* Additional styles for the improved editor (only) */
+        .preview-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .preview-question {
+            font-size: 1rem;
+            line-height: 1.5;
+            margin-bottom: 16px;
+        }
+        .preview-option {
+            border: 1px solid #d1d5db;
+            padding: 6px 12px;
+            margin: 6px 0;
+            border-radius: 8px;
+            background: white;
+        }
+        .preview-option-correct {
+            background: #e6f9ed;
+            border-color: #2fb138;
+            border-width: 2px;
+        }
+        .preview-explanation {
+            margin-top: 12px;
+            padding: 8px;
+            background: #fefce8;
+            border-left: 4px solid #eab308;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+        .editor-split {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .editor-left, .editor-right {
+            flex: 1;
+            min-width: 250px;
+        }
+        .option-editor {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .option-editor textarea {
+            flex: 1;
+            resize: vertical;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -92,7 +147,7 @@
                 </button>
             </div>
 
-            <!-- Quick Upload Tab -->
+            <!-- Quick Upload Tab (unchanged) -->
             <div id="quick-tab" class="tab-content active bg-white rounded-lg shadow-md p-6">
                 <h2 class="text-xl font-semibold mb-4">Quick Upload – No JSON File Needed</h2>
                 <p class="text-gray-600 mb-6">Select the lecture, paste your questions array, and upload.</p>
@@ -160,7 +215,7 @@
                 </div>
             </div>
 
-            <!-- JSON Upload Tab -->
+            <!-- JSON Upload Tab (unchanged) -->
             <div id="json-tab" class="tab-content bg-white rounded-lg shadow-md p-6">
                 <h2 class="text-xl font-semibold mb-4">Upload DPP JSON File</h2>
                 <p class="text-gray-600 mb-4">Upload a complete JSON file. If lectureId is omitted, lectureName will be used to find the lecture.</p>
@@ -179,7 +234,7 @@
                 </div>
             </div>
 
-            <!-- Question Editor Tab -->
+            <!-- ========== QUESTION EDITOR TAB (IMPROVED WITH PREVIEW) ========== -->
             <div id="editor-tab" class="tab-content bg-white rounded-lg shadow-md p-6">
                 <h2 class="text-xl font-semibold mb-4">Edit / Delete DPP Questions</h2>
                 <div class="mb-4 flex flex-wrap gap-4 items-end">
@@ -199,14 +254,11 @@
                 <div class="mt-4 p-3 bg-blue-50 rounded-lg text-sm border border-blue-200">
                     <i class="fas fa-square-root-alt mr-1 text-blue-600"></i>
                     <strong class="text-blue-800">LaTeX in questions & options:</strong>
-                    <p class="text-xs text-gray-700 mt-1">You can edit question text and options using LaTeX – the DPP viewer will render them beautifully.</p>
-                    <div class="mt-2 text-xs text-gray-700">
-                        Example: <code class="bg-gray-200 px-1 rounded">\(x^2 + 3x - 5 = 0\)</code> → \(x^2 + 3x - 5 = 0\)
-                    </div>
+                    <p class="text-xs text-gray-700 mt-1">You can edit question text and options using LaTeX – the preview will render them. Each question has a live preview on the right.</p>
                 </div>
             </div>
 
-            <!-- Motivation Tab -->
+            <!-- Motivation Tab (unchanged) -->
             <div id="motivation-tab" class="tab-content bg-white rounded-lg shadow-md p-6">
                 <h2 class="text-xl font-semibold mb-4">Manage Motivation Popup</h2>
                 <p class="text-gray-600 mb-6">Set the start date and define messages for each week/day.</p>
@@ -250,7 +302,7 @@
                 <div id="motivation-result" class="mt-4 p-4 rounded hidden"></div>
             </div>
 
-            <!-- Migrate Tab -->
+            <!-- Migrate Tab (unchanged) -->
             <div id="migrate-tab" class="tab-content bg-white rounded-lg shadow-md p-6">
                 <h2 class="text-xl font-semibold mb-4">Migrate Static DPP Files</h2>
                 <p class="text-gray-600 mb-4">Run the migration script on the server to bulk import static DPPs.</p>
@@ -443,9 +495,7 @@
                 } catch (err) {
                     resultDiv.classList.remove('hidden');
                     resultDiv.className = 'mt-4 p-4 bg-red-50 border border-red-300 rounded';
-                    resultDiv.innerHTML = `<p class="font-medium text-red-800">❌ Request failed</p>
-                                        <p class="text-sm">${err.message}</p>`;
-
+                    resultDiv.innerHTML = `<p class="font-medium text-red-800">❌ Network error</p>`;
                 } finally {
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fas fa-cloud-upload-alt mr-2"></i>Upload DPP';
@@ -494,7 +544,7 @@
             });
         }
 
-        // ========== QUESTION EDITOR ==========
+        // ========== QUESTION EDITOR (improved with live preview) ==========
         async function loadEditorLectures() {
             const select = document.getElementById('editor-lecture-select');
             if (!select) return;
@@ -513,7 +563,7 @@
             }
         }
 
-        // Delete DPP
+        // Delete DPP (unchanged)
         document.getElementById('delete-dpp-btn').addEventListener('click', async () => {
             const select = document.getElementById('editor-lecture-select');
             const lectureId = select.value;
@@ -546,6 +596,7 @@
             }
         });
 
+        // Load DPP and render improved editor form
         document.getElementById('editor-lecture-select').addEventListener('change', async (e) => {
             const lectureId = e.target.value;
             const container = document.getElementById('editor-form-container');
@@ -565,29 +616,135 @@
             }
         });
 
+        function cleanHtml(html) {
+            if (!html) return '';
+            // Remove <style> tags for preview only – stored HTML remains untouched
+            return html.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+        }
+
+        function renderMathInContainer(container) {
+            if (typeof window.renderMathInElement === 'function') {
+                window.renderMathInElement(container, {
+                    delimiters: [
+                        {left: '\\\\(', right: '\\\\)', display: false},
+                        {left: '\\\\[', right: '\\\\]', display: true},
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false}
+                    ],
+                    throwOnError: false
+                });
+            } else {
+                setTimeout(() => renderMathInContainer(container), 100);
+            }
+        }
+
         function renderEditorForm(dpp, containerElement) {
-            if (!containerElement) return;
             let html = `<div class="border-t pt-4"><h3 class="text-lg font-medium mb-4">Editing: ${dpp.lectureName}</h3>`;
             dpp.questions.forEach((q, i) => {
-                html += `<div class="border rounded-lg p-4 mb-4 bg-gray-50" data-question-id="${q.id}">
-                    <p class="font-medium">Q${i+1}: <input type="text" data-field="text" value="${q.questionText.replace(/"/g, '&quot;')}" class="w-full p-2 border rounded mt-1"></p>`;
-                q.options.forEach((opt, oi) => {
-                    html += `<input type="text" data-field="opt${oi}" value="${opt.replace(/"/g, '&quot;')}" class="w-full p-2 border rounded mb-1 ml-4">`;
-                });
-                html += `<p class="mt-2">Correct: <input type="number" data-field="correct" value="${q.correctAnswer}" min="0" max="${q.options.length-1}" class="w-20 p-1 border rounded"></p>
-                    <p>Difficulty:
-                        <select data-field="diff" class="border rounded p-1">
-                            <option ${q.difficulty === 'EASY' ? 'selected' : ''}>EASY</option>
-                            <option ${q.difficulty === 'MEDIUM' ? 'selected' : ''}>MEDIUM</option>
-                            <option ${q.difficulty === 'HARD' ? 'selected' : ''}>HARD</option>
-                        </select>
-                    </p>
-                    <p>Date: <input type="text" data-field="date" value="${q.date || ''}" class="border rounded p-1"></p>
-                    <p>Explanation: <textarea data-field="explanation" rows="3" class="w-full p-2 border rounded mt-1">${(q.explanation || '').replace(/"/g, '&quot;')}</textarea></p>
-                </div>`;
+                const escapedText = q.questionText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const escapedOptions = q.options.map(opt => opt.replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+                const escapedExplanation = (q.explanation || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                html += `
+                    <div class="border rounded-lg p-4 mb-6 bg-gray-50" data-question-id="${q.id}">
+                        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                            <!-- LEFT COLUMN: Question, Options, Metadata -->
+                            <div style="flex: 1; min-width: 280px;">
+                                <!-- Question HTML -->
+                                <label class="font-medium block mb-1">Question HTML:</label>
+                                <textarea data-field="text" rows="5" class="w-full p-2 border rounded font-mono text-sm">${escapedText}</textarea>
+
+                                <!-- Options Editor (compact grid) placed below question -->
+                                <div class="mt-3">
+                                    <label class="font-medium block mb-1">Options (HTML):</label>
+                                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;">
+                                        ${escapedOptions.map((opt, oi) => `
+                                            <div>
+                                                <span class="text-sm font-bold">${String.fromCharCode(65+oi)}.</span>
+                                                <textarea data-field="opt${oi}" rows="1" class="w-full p-1 border rounded font-mono text-sm" style="resize: vertical; font-size: 0.85rem;">${opt}</textarea>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+
+                                <!-- Correct, Difficulty, Date (compact row) -->
+                                <div class="mt-3 flex flex-wrap gap-3 items-center">
+                                    <div><label class="text-xs">Correct (0‑index):</label>
+                                        <input type="number" data-field="correct" value="${q.correctAnswer}" min="0" max="${q.options.length-1}" class="w-16 p-1 border rounded text-sm"></div>
+                                    <div><label class="text-xs">Difficulty:</label>
+                                        <select data-field="diff" class="border rounded p-1 text-sm">
+                                            <option ${q.difficulty === 'EASY' ? 'selected' : ''}>EASY</option>
+                                            <option ${q.difficulty === 'MEDIUM' ? 'selected' : ''}>MEDIUM</option>
+                                            <option ${q.difficulty === 'HARD' ? 'selected' : ''}>HARD</option>
+                                        </select>
+                                    </div>
+                                    <div><label class="text-xs">Date:</label>
+                                        <input type="text" data-field="date" value="${q.date || ''}" class="border rounded p-1 text-sm w-24"></div>
+                                </div>
+
+                                <!-- Explanation -->
+                                <div class="mt-3">
+                                    <label class="font-medium block mb-1">Explanation HTML:</label>
+                                    <textarea data-field="explanation" rows="2" class="w-full p-2 border rounded font-mono text-sm">${escapedExplanation}</textarea>
+                                </div>
+                            </div>
+
+                            <!-- RIGHT COLUMN: Live Preview (question + options + explanation) -->
+                            <div style="flex: 1; min-width: 280px;">
+                                <div class="preview-card">
+                                    <div class="preview-question"></div>
+                                    <div class="preview-options-list"></div>
+                                    <div class="preview-explanation" style="display:none;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
             });
             html += `<button id="save-edits" class="bg-blue-600 text-white px-6 py-2 rounded">Save Changes</button></div>`;
             containerElement.innerHTML = html;
+
+            // Attach live preview listeners
+            document.querySelectorAll('[data-question-id]').forEach(card => {
+                const qTextarea = card.querySelector('[data-field="text"]');
+                const optTextareas = card.querySelectorAll('[data-field^="opt"]');
+                const correctInput = card.querySelector('[data-field="correct"]');
+                const explanationTextarea = card.querySelector('[data-field="explanation"]');
+                const previewQuestion = card.querySelector('.preview-question');
+                const previewOptions = card.querySelector('.preview-options-list');
+                const previewExplanation = card.querySelector('.preview-explanation');
+
+                const updatePreview = () => {
+                    const qHtml = cleanHtml(qTextarea.value);
+                    const optHtml = Array.from(optTextareas).map((ta, idx) => {
+                        const optClean = cleanHtml(ta.value);
+                        const isCorrect = (parseInt(correctInput.value) === idx);
+                        return `<div class="preview-option ${isCorrect ? 'preview-option-correct' : ''}">
+                                    <span class="font-semibold">${String.fromCharCode(65+idx)}.</span> ${optClean}
+                                </div>`;
+                    }).join('');
+                    const explHtml = cleanHtml(explanationTextarea.value);
+                    previewQuestion.innerHTML = qHtml;
+                    previewOptions.innerHTML = optHtml;
+                    if (explHtml.trim()) {
+                        previewExplanation.innerHTML = `<i class="fas fa-lightbulb text-yellow-500 mr-1"></i> ${explHtml}`;
+                        previewExplanation.style.display = 'block';
+                    } else {
+                        previewExplanation.style.display = 'none';
+                    }
+                    renderMathInContainer(previewQuestion);
+                    renderMathInContainer(previewOptions);
+                    renderMathInContainer(previewExplanation);
+                };
+
+                let timeout;
+                const debounced = () => { clearTimeout(timeout); timeout = setTimeout(updatePreview, 400); };
+                qTextarea.addEventListener('input', debounced);
+                optTextareas.forEach(ta => ta.addEventListener('input', debounced));
+                explanationTextarea.addEventListener('input', debounced);
+                correctInput.addEventListener('input', updatePreview);
+                updatePreview();
+            });
+
             const saveBtn = document.getElementById('save-edits');
             if (saveBtn) {
                 saveBtn.addEventListener('click', () => saveEditorChanges(dpp.lectureId));
